@@ -31,10 +31,19 @@ async function build() {
     await safeExecute(async () => await fs.copy('pages/', 'public/', { filter: (f) => !f.endsWith('.md') }))
     await safeExecute(async () => await fs.copy('static/', 'public/'))
 
-    const pages = await fs.readdir('pages/')
+    await processDirectory('pages')
+}
+
+async function processDirectory(directoryPath) {
+    let contents = await fs.readdir(`${directoryPath}/`)
     const processPagePromises = []
-    for (const page of pages) {
-        processPagePromises.push(processPage(page))
+    for (const element of contents) {
+        const isDirectory = (await fs.lstat(`${directoryPath}/${element}`)).isDirectory()
+        if (isDirectory) {
+            await processDirectory(`${directoryPath}/${element}`, processPagePromises)
+            continue
+        }
+        processPagePromises.push(processPage(`${directoryPath}/${element}`))
     }
     await Promise.all(processPagePromises)
 }
@@ -59,6 +68,7 @@ async function init() {
     const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script src='main.js' /></body></html>`
     const defaultTemplate = `<html><body><div id='page-content'></div></body></html>`
     const exampleStaticAssetJs = `console.log('hello world')`
+
     await fs.writeFile('pages/index.md', examplePage)
     await fs.writeFile('templates/homepage.html', exampleTemplate)
     await fs.writeFile('templates/default.html', defaultTemplate)
@@ -67,7 +77,7 @@ async function init() {
 
 async function processPage(pagePath) {
     let templatePath = 'templates/default.html'
-    const markdown = await fs.readFile(`pages/${pagePath}`, 'utf-8')
+    const markdown = await fs.readFile(pagePath, 'utf-8')
     const firstLine = markdown.split('\n')[0]
     if (firstLine.match(/<!--.*template.*-->/g)) {
         const templateName = firstLine.split('template:')[1].trim().split(' ')[0].trim()
@@ -84,7 +94,7 @@ async function processPage(pagePath) {
         pageContentElement.innerHTML = parsedHtml
     } else {
         console.log(
-            `Could not find element with id 'page-content' in template ${templateName}. Generating page without markdown content.`
+            `Could not find element with id 'page-content' in template ${templatePath}. Generating page without markdown content.`
         )
     }
 
@@ -104,8 +114,10 @@ async function processPage(pagePath) {
 
     const finalHtml = `<html>${sourceHtml}</html>`
 
-    const pageName = pagePath.split('.md')[0]
-    await fs.writeFile(`public/${pageName}.html`, finalHtml)
+    const pagePathParts = pagePath.replace('pages/', '').split('/')
+    const pageName = pagePathParts.pop().split('.md')[0]
+    const targetPath = pagePathParts.join('/')
+    await fs.writeFile(`public/${targetPath}/${pageName}.html`, finalHtml)
 }
 
 function startServer(port) {
