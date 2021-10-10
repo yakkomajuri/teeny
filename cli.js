@@ -6,7 +6,6 @@ const marked = require('marked')
 const http = require('http')
 const chokidar = require('chokidar')
 
-
 const scriptArgs = process.argv.slice(2)
 const command = scriptArgs[0]
 
@@ -49,7 +48,6 @@ async function develop(port) {
         await watcher.close()
         await develop(port)
     })
-
 }
 
 async function init() {
@@ -85,9 +83,11 @@ async function processPage(pagePath) {
     if (pageContentElement) {
         pageContentElement.innerHTML = parsedHtml
     } else {
-        console.log(`Could not find element with id 'page-content' in template ${templateName}. Generating page without markdown content.`)
+        console.log(
+            `Could not find element with id 'page-content' in template ${templateName}. Generating page without markdown content.`
+        )
     }
-    
+
     const wrapperHtmlElement = document.getElementsByTagName('html')
     if (!wrapperHtmlElement.length) {
         console.log(`Templates should contain the 'html' tag.`)
@@ -110,28 +110,30 @@ async function processPage(pagePath) {
 
 function startServer(port) {
     console.log(`Development server starting on http://localhost:${port}`)
-    return http.createServer(function (req, res) {
-        const url = req.url
-        let filePath = url
-        if (url === '/') {
-            filePath = '/index.html'
-        } else if (!url.includes('.')) {
-            filePath += '.html'
-        }
-        fs.readFile('public' + filePath, function (err, data) {
-            if (err) {
-                res.writeHead(404)
-                res.end('<h1>404: Page not found</h1>')
-                return
+    return http
+        .createServer(function (req, res) {
+            const url = req.url
+            let filePath = url
+            if (url === '/') {
+                filePath = '/index.html'
+            } else if (!url.includes('.')) {
+                filePath += '.html'
             }
-            res.writeHead(200)
-            res.end(data)
+            fs.readFile('public' + filePath, function (err, data) {
+                if (err) {
+                    res.writeHead(404)
+                    res.end('<h1>404: Page not found</h1>')
+                    return
+                }
+                res.writeHead(200)
+                res.end(data)
+            })
         })
-    }).listen(port)
+        .listen(port)
 }
 
 async function safeExecute(func) {
     try {
         await func()
-    } catch { }
+    } catch {}
 }
