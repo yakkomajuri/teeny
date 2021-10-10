@@ -1,7 +1,8 @@
 {
-    "name": "teeny",
+    "name": "teeny-cli",
     "version": "0.0.1",
     "description": "A very simple static site generator",
+    "author": "Yakko Majuri",
     "main": "cli.js",
     "license": "MIT",
     "bin": {
