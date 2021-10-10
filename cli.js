@@ -4,6 +4,8 @@ const { JSDOM } = require('jsdom')
 const fs = require('fs-extra')
 const marked = require('marked')
 const http = require('http')
+const chokidar = require('chokidar')
+
 
 const scriptArgs = process.argv.slice(2)
 const command = scriptArgs[0]
@@ -40,7 +42,14 @@ async function build() {
 
 async function develop(port) {
     await build()
-    startServer(port)
+    const server = startServer(port)
+    const watcher = chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (path, _) => {
+        console.log(`Detected change in file ${path}. Restarting development server.`)
+        server.close()
+        await watcher.close()
+        await develop(port)
+    })
+
 }
 
 async function init() {
@@ -50,9 +59,11 @@ async function init() {
 
     const examplePage = `<!-- template: homepage -->\n# Hello World`
     const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script src='main.js' /></body></html>`
+    const defaultTemplate = `<html><body><div id='page-content'></div></body></html>`
     const exampleStaticAssetJs = `console.log('hello world')`
     await fs.writeFile('pages/index.md', examplePage)
     await fs.writeFile('templates/homepage.html', exampleTemplate)
+    await fs.writeFile('templates/default.html', defaultTemplate)
     await fs.writeFile('static/main.js', exampleStaticAssetJs)
 }
 
@@ -68,7 +79,15 @@ async function processPage(pagePath) {
     const dom = await JSDOM.fromFile(templatePath)
     const parsedHtml = marked(markdown)
     const document = dom.window.document
-    document.getElementById('page-content').innerHTML = parsedHtml
+
+    const pageContentElement = document.getElementById('page-content')
+
+    if (pageContentElement) {
+        pageContentElement.innerHTML = parsedHtml
+    } else {
+        console.log(`Could not find element with id 'page-content' in template ${templateName}. Generating page without markdown content.`)
+    }
+    
     const wrapperHtmlElement = document.getElementsByTagName('html')
     if (!wrapperHtmlElement.length) {
         console.log(`Templates should contain the 'html' tag.`)
@@ -91,7 +110,7 @@ async function processPage(pagePath) {
 
 function startServer(port) {
     console.log(`Development server starting on http://localhost:${port}`)
-    http.createServer(function (req, res) {
+    return http.createServer(function (req, res) {
         const url = req.url
         let filePath = url
         if (url === '/') {
@@ -114,5 +133,5 @@ function startServer(port) {
 async function safeExecute(func) {
     try {
         await func()
-    } catch {}
+    } catch { }
 }
