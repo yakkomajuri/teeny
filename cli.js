@@ -1,0 +1,118 @@
+#!/usr/bin/env node
+
+const { JSDOM } = require('jsdom')
+const fs = require('fs-extra')
+const marked = require('marked')
+const http = require('http')
+
+const scriptArgs = process.argv.slice(2)
+const command = scriptArgs[0]
+
+switch (command) {
+    case 'build':
+        build()
+        break
+    case 'develop':
+        develop(scriptArgs[1] ? Number(scriptArgs[1]) : 8000)
+        break
+    case 'init':
+        init()
+        break
+    default:
+        console.log(`Command ${command} does not exist. Please use 'teeny build'.`)
+        process.exit(1)
+}
+
+async function build() {
+    await fs.emptyDir('public/')
+
+    await safeExecute(async () => await fs.copy('templates/', 'public/', { filter: (f) => !f.endsWith('.html') }))
+    await safeExecute(async () => await fs.copy('pages/', 'public/', { filter: (f) => !f.endsWith('.md') }))
+    await safeExecute(async () => await fs.copy('static/', 'public/'))
+
+    const pages = await fs.readdir('pages/')
+    const processPagePromises = []
+    for (const page of pages) {
+        processPagePromises.push(processPage(page))
+    }
+    await Promise.all(processPagePromises)
+}
+
+async function develop(port) {
+    await build()
+    startServer(port)
+}
+
+async function init() {
+    await safeExecute(async () => await fs.mkdir('pages/'))
+    await safeExecute(async () => await fs.mkdir('static/'))
+    await safeExecute(async () => await fs.mkdir('templates/'))
+
+    const examplePage = `<!-- template: homepage -->\n# Hello World`
+    const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script src='main.js' /></body></html>`
+    const exampleStaticAssetJs = `console.log('hello world')`
+    await fs.writeFile('pages/index.md', examplePage)
+    await fs.writeFile('templates/homepage.html', exampleTemplate)
+    await fs.writeFile('static/main.js', exampleStaticAssetJs)
+}
+
+async function processPage(pagePath) {
+    let templatePath = 'templates/default.html'
+    const markdown = await fs.readFile(`pages/${pagePath}`, 'utf-8')
+    const firstLine = markdown.split('\n')[0]
+    if (firstLine.match(/<!--.*template.*-->/g)) {
+        const templateName = firstLine.split('template:')[1].trim().split(' ')[0].trim()
+        templatePath = `templates/${templateName}.html`
+    }
+
+    const dom = await JSDOM.fromFile(templatePath)
+    const parsedHtml = marked(markdown)
+    const document = dom.window.document
+    document.getElementById('page-content').innerHTML = parsedHtml
+    const wrapperHtmlElement = document.getElementsByTagName('html')
+    if (!wrapperHtmlElement.length) {
+        console.log(`Templates should contain the 'html' tag.`)
+        process.exit(1)
+    }
+
+    const h1s = document.getElementsByTagName('h1')
+
+    if (h1s.length) {
+        document.title = h1s[0].innerHTML
+    }
+
+    const sourceHtml = document.getElementsByTagName('html')[0].innerHTML
+
+    const finalHtml = `<html>${sourceHtml}</html>`
+
+    const pageName = pagePath.split('.md')[0]
+    await fs.writeFile(`public/${pageName}.html`, finalHtml)
+}
+
+function startServer(port) {
+    console.log(`Development server starting on http://localhost:${port}`)
+    http.createServer(function (req, res) {
+        const url = req.url
+        let filePath = url
+        if (url === '/') {
+            filePath = '/index.html'
+        } else if (!url.includes('.')) {
+            filePath += '.html'
+        }
+        fs.readFile('public' + filePath, function (err, data) {
+            if (err) {
+                res.writeHead(404)
+                res.end('<h1>404: Page not found</h1>')
+                return
+            }
+            res.writeHead(200)
+            res.end(data)
+        })
+    }).listen(port)
+}
+
+async function safeExecute(func) {
+    try {
+        await func()
+    } catch {}
+}

@@ -1,0 +1,25 @@
+{
+    "name": "teeny",
+    "version": "0.0.1",
+    "description": "A very simple static site generator",
+    "main": "cli.js",
+    "license": "MIT",
+    "bin": {
+        "teeny": "cli.js"
+    },
+    "scripts": {
+        "dev:build": "npm run dev && teeny build",
+        "dev:develop": "npm run dev && teeny develop",
+        "dev:init": "npm run dev && teeny init",
+        "dev": "rm teeny-* || true && npm pack && npm i -g teeny-*.tgz -f",
+        "lint": "prettier --write ."
+    },
+    "devDependencies": {
+        "prettier": "^2.4.1"
+    },
+    "dependencies": {
+        "fs-extra": "^10.0.0",
+        "jsdom": "^18.0.0",
+        "marked": "^3.0.7"
+    }
+}

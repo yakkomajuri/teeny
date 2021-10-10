@@ -1,0 +1,8 @@
+yarn-error.log
+teeny-*.tgz 
+node_modules/
+pages/
+public/
+templates/
+static/
+test/
