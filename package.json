@@ -8,6 +8,10 @@
     "bin": {
         "teeny": "cli.js"
     },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yakkomajuri/teeny.git"
+    },
     "scripts": {
         "dev:build": "npm run dev && teeny build",
         "dev:develop": "npm run dev && teeny develop",

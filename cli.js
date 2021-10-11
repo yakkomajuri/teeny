@@ -27,8 +27,13 @@ switch (command) {
 async function build() {
     await fs.emptyDir('public/')
 
-    await safeExecute(async () => await fs.copy('templates/', 'public/', { filter: (f) => !f.startsWith('.') && !f.endsWith('.html') }))
-    await safeExecute(async () => await fs.copy('pages/', 'public/', { filter: (f) => !f.startsWith('.') && !f.endsWith('.md') }))
+    await safeExecute(
+        async () =>
+            await fs.copy('templates/', 'public/', { filter: (f) => !f.startsWith('.') && !f.endsWith('.html') })
+    )
+    await safeExecute(
+        async () => await fs.copy('pages/', 'public/', { filter: (f) => !f.startsWith('.') && !f.endsWith('.md') })
+    )
     await safeExecute(async () => await fs.copy('static/', 'public/'), { filter: (f) => !f.startsWith('.') })
 
     await processDirectory('pages')
