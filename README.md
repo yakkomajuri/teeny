@@ -5,7 +5,7 @@
 ## 🏃 Quick start
 
 ```shell
-npm i -g teeny # yarn global add teeny
+npm i -g teeny-cli # yarn global add teeny-cli
 teeny init && teeny develop
 ```
 
