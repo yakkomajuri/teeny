@@ -20,7 +20,7 @@ switch (command) {
         init()
         break
     default:
-        console.log(`Command ${command} does not exist. Please use 'teeny build'.`)
+        console.log(`Command 'teeny ${command}' does not exist.`)
         process.exit(1)
 }
 
