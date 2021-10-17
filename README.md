@@ -57,10 +57,12 @@ Markdown is a first-class citizen in Teeny, so all of your website's pages are d
 
 The file need not have any actual content though, so if you want a page to be defined purely in HTML you just need to create a template that is referenced from a page file.
 
-To specify what template a page should use, you add an HTML comment on the first line of the page file, like so:
+To specify what template a page should use, you can specify it in the frontmatter of the page, like so:
 
 ```
-<!-- template: blog -->
+---
+template: blog
+---
 ```
 
 In the above example, Teeny will look for a template called `blog.html`. If no template is specified, Teeny looks for a `default.html` file in `templates/` and uses that.
