@@ -5,7 +5,10 @@ const fs = require('fs-extra')
 const marked = require('marked')
 const http = require('http')
 const chokidar = require('chokidar')
+const fm = require('front-matter')
 
+// attributes: { template: "custom.html" }
+// body: "# My normal markdown ..."
 const scriptArgs = process.argv.slice(2)
 const command = scriptArgs[0]
 
@@ -82,13 +85,11 @@ async function init() {
 
 async function processPage(pagePath) {
     let templatePath = 'templates/default.html'
-    const markdown = await fs.readFile(pagePath, 'utf-8')
-    const firstLine = markdown.split('\n')[0]
-    if (firstLine.match(/<!--.*template.*-->/g)) {
-        const templateName = firstLine.split('template:')[1].trim().split(' ')[0].trim()
-        templatePath = `templates/${templateName}.html`
+    const fileData = await fs.readFile(pagePath, 'utf-8')
+    const { attributes: frontmatter, body: markdown } = await fm(fileData)
+    if (frontmatter.template) {
+        templatePath = `templates/${frontmatter.template}.html`
     }
-
     const dom = await JSDOM.fromFile(templatePath)
     const parsedHtml = marked(markdown)
     const document = dom.window.document
@@ -109,10 +110,16 @@ async function processPage(pagePath) {
         process.exit(1)
     }
 
-    const h1s = document.getElementsByTagName('h1')
+    let title = frontmatter.title
+    if (!title) {
+        const h1s = document.getElementsByTagName('h1')
+        if (h1s.length) {
+            title = h1s[0].innerHTML
+        }
+    }
 
-    if (h1s.length) {
-        document.title = h1s[0].innerHTML
+    if (title) {
+        document.title = title
     }
 
     const finalHtml = document.getElementsByTagName('html')[0].outerHTML
