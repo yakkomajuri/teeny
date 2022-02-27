@@ -2,7 +2,7 @@
 
 const { JSDOM } = require('jsdom')
 const fs = require('fs-extra')
-const marked = require('marked')
+const { marked } = require('marked')
 const http = require('http')
 const chokidar = require('chokidar')
 const fm = require('front-matter')
@@ -91,7 +91,7 @@ async function processPage(pagePath) {
         templatePath = `templates/${frontmatter.template}.html`
     }
     const dom = await JSDOM.fromFile(templatePath)
-    const parsedHtml = marked(markdown)
+    const parsedHtml = marked.parse(markdown)
     const document = dom.window.document
 
     const pageContentElement = document.getElementById('page-content')
