@@ -112,6 +112,12 @@ The last command that Teeny supports is `teeny develop`. This creates an HTTP se
 
 It listens for changes to the files and updates the static files on the fly (naively, by just rebuilding everything each time it detects a change).
 
+## 🤖 Advanced Features
+
+**Replace**
+
+Page specific variables can be specified in the frontmatter and are inserted into the template at places specified using double curly braces. An example of this is used in the `homepage.html` file.
+
 ## 🔮 Potential future improvements
 
 I want to keep Teeny as tiny as possible. I deliberately put all the code in one file as a reminder to myself that this is supposed to just be a simple tool for me to build simple static blogs quickly.

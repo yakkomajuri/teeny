@@ -72,10 +72,11 @@ async function init() {
     await safeExecute(async () => await fs.mkdir('static/'))
     await safeExecute(async () => await fs.mkdir('templates/'))
 
-    const examplePage = `---\ntemplate: homepage\n---\n# Hello World`
-    const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script type="text/javascript" src='main.js'></body></html>`
-    const defaultTemplate = `<html><body><div id='page-content'></div></body></html>`
-    const exampleStaticAssetJs = `console.log('hello world')`
+    const examplePage = `---\ntemplate: homepage\ntitle: Teeny page\n---\n\nHello World\n`
+
+    const exampleTemplate = `<html>\n    <head>\n        <title>{{ title }}</title>\n    </head>\n\n    <body>\n        <p>My first Teeny page</p>\n        <div id="page-content"></div>\n        <script type="text/javascript" src="main.js"></script>\n    </body>\n</html>\n`
+    const defaultTemplate = `<html>\n    <body>\n        <div id="page-content"></div>\n    </body>\n</html>\n`
+    const exampleStaticAssetJs = `console.log('hello world')\n`
 
     await fs.writeFile('pages/index.md', examplePage)
     await fs.writeFile('templates/homepage.html', exampleTemplate)
@@ -90,7 +91,14 @@ async function processPage(pagePath) {
     if (frontmatter.template) {
         templatePath = `templates/${frontmatter.template}.html`
     }
-    const dom = await JSDOM.fromFile(templatePath)
+
+    let templateString = await fs.readFile(templatePath, 'utf-8')
+
+    for (const key in frontmatter) {
+        templateString = templateString.replaceAll(`{{ ${key} }}`, frontmatter[key])
+    }
+
+    const dom = new JSDOM(templateString)
     const parsedHtml = marked.parse(markdown)
     const document = dom.window.document
 
@@ -110,16 +118,15 @@ async function processPage(pagePath) {
         process.exit(1)
     }
 
-    let title = frontmatter.title
-    if (!title) {
-        const h1s = document.getElementsByTagName('h1')
-        if (h1s.length) {
-            title = h1s[0].innerHTML
+    if (!document.title || document.title == `{{ title }}`) {
+        if (!frontmatter.title) {
+            const h1s = document.getElementsByTagName('h1')
+            if (h1s.length) {
+                document.title = h1s[0].innerHTML
+            }
+        } else {
+            document.title = frontmatter.title
         }
-    }
-
-    if (title) {
-        document.title = title
     }
 
     const finalHtml = document.getElementsByTagName('html')[0].outerHTML
