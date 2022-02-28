@@ -72,9 +72,9 @@ async function init() {
     await safeExecute(async () => await fs.mkdir('static/'))
     await safeExecute(async () => await fs.mkdir('templates/'))
 
-    const examplePage = `---\ntemplate: homepage\ntitle: Teeny page\n---\n\nHello World\n`
+    const examplePage = `---\ntemplate: homepage\ntitle: Teeny page\nauthor: teeny\n---\n\n# Hello World\n`
 
-    const exampleTemplate = `<html>\n    <head>\n        <title>{{ title }}</title>\n    </head>\n\n    <body>\n        <p>My first Teeny page</p>\n        <div id="page-content"></div>\n        <script type="text/javascript" src="main.js"></script>\n    </body>\n</html>\n`
+    const exampleTemplate = `<html>\n    <head>\n        <title>{{ title }}</title>\n        <meta name="author" content="{{ author }}" />\n    </head>\n\n    <body>\n        <p>My first Teeny page</p>\n        <div id="page-content"></div>\n        <script type="text/javascript" src="main.js"></script>\n    </body>\n</html>\n`
     const defaultTemplate = `<html>\n    <body>\n        <div id="page-content"></div>\n    </body>\n</html>\n`
     const exampleStaticAssetJs = `console.log('hello world')\n`
 
