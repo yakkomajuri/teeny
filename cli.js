@@ -171,8 +171,8 @@ async function processPage(pagePath) {
     const pagePathParts = pagePath.replace('pages/', '').split('/')
     const pageName = pagePathParts.pop().split('.md')[0]
     const targetPath = pagePathParts.join('/')
-    await fs.writeFile(`public/${targetPath}/${pageName}.html`, finalHtml)
-    console.log(`Build public${targetPath}/${pageName}.html`)
+    await fs.outputFile(`public/${targetPath}/${pageName}.html`, finalHtml)
+    console.log(`Build public/${targetPath}/${pageName}.html`)
 }
 
 function startServer(port) {
