@@ -7,6 +7,9 @@ const http = require('http')
 const chokidar = require('chokidar')
 const fm = require('front-matter')
 
+const templateUsageMap = new Map() // key = templatePath, value = Set of pagePaths
+const pageUsageMap = new Map() // key = pagePath, value = templatePath
+
 // attributes: { template: "custom.html" }
 // body: "# My normal markdown ..."
 const scriptArgs = process.argv.slice(2)
@@ -32,12 +35,19 @@ async function build() {
 
     await safeExecute(
         async () =>
-            await fs.copy('templates/', 'public/', { filter: (f) => !f.startsWith('.') && !f.endsWith('.html') })
+            await fs.copy('templates/', 'public/', {
+                filter: (src, dest) => isNotHiddenFile(src, dest) && !src.endsWith('.html'),
+            })
     )
     await safeExecute(
-        async () => await fs.copy('pages/', 'public/', { filter: (f) => !f.startsWith('.') && !f.endsWith('.md') })
+        async () =>
+            await fs.copy('pages/', 'public/', {
+                filter: (src, dest) => isNotHiddenFile(src, dest) && !src.endsWith('.md'),
+            })
     )
-    await safeExecute(async () => await fs.copy('static/', 'public/'), { filter: (f) => !f.startsWith('.') })
+    await safeExecute(
+        async () => await fs.copy('static/', 'public/', { filter: (src, dest) => isNotHiddenFile(src, dest) })
+    )
 
     await processDirectory('pages')
 }
@@ -60,10 +70,25 @@ async function develop(port) {
     await build()
     const server = startServer(port)
     const watcher = chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (path, _) => {
-        console.log(`Detected change in file ${path}. Restarting development server.`)
-        server.close()
-        await watcher.close()
-        await develop(port)
+        console.log(`Detected change in file ${path}.`)
+        if (
+            path.startsWith('static/') ||
+            (path.startsWith('templates/') && !path.endsWith('.html')) ||
+            (path.startsWith('pages/') && !path.endsWith('.md'))
+        ) {
+            await safeExecute(
+                async () =>
+                    await fs.copy(path, `public/${path.substring(path.split('/')[0].length + 1)}`, {
+                        filter: (src, dest) => isNotHiddenFile(src, dest),
+                    })
+            )
+        } else if (path.startsWith('pages/')) {
+            processPage(path)
+        } else if (templateUsageMap.has(path)) {
+            templateUsageMap.get(path).forEach((element) => {
+                processPage(element)
+            })
+        }
     })
 }
 
@@ -91,6 +116,18 @@ async function processPage(pagePath) {
     if (frontmatter.template) {
         templatePath = `templates/${frontmatter.template}.html`
     }
+
+    if (pageUsageMap.has(pagePath)) {
+        templateUsageMap.get(pageUsageMap.get(pagePath)).delete(pagePath)
+    }
+
+    if (templateUsageMap.has(templatePath)) {
+        templateUsageMap.get(templatePath).add(pagePath)
+    } else {
+        templateUsageMap.set(templatePath, new Set([pagePath]))
+    }
+
+    pageUsageMap.set(pagePath, templatePath)
 
     let templateString = await fs.readFile(templatePath, 'utf-8')
 
@@ -135,6 +172,7 @@ async function processPage(pagePath) {
     const pageName = pagePathParts.pop().split('.md')[0]
     const targetPath = pagePathParts.join('/')
     await fs.writeFile(`public/${targetPath}/${pageName}.html`, finalHtml)
+    console.log(`Build public${targetPath}/${pageName}.html`)
 }
 
 function startServer(port) {
@@ -165,4 +203,8 @@ async function safeExecute(func) {
     try {
         await func()
     } catch {}
+}
+
+function isNotHiddenFile(src, dest) {
+    return !src.match(/.+\/\..*/)
 }
