@@ -6,6 +6,7 @@ const { marked } = require('marked')
 const http = require('http')
 const chokidar = require('chokidar')
 const fm = require('front-matter')
+const path = require('path')
 
 const templateUsageMap = new Map() // key = templatePath, value = Set of pagePaths
 const pageUsageMap = new Map() // key = pagePath, value = templatePath
@@ -45,9 +46,7 @@ async function build() {
                 filter: (src, dest) => isNotHiddenFile(src) && !src.endsWith('.md'),
             })
     )
-    await safeExecute(
-        async () => await fs.copy('static/', 'public/', { filter: (src, dest) => isNotHiddenFile(src) })
-    )
+    await safeExecute(async () => await fs.copy('static/', 'public/', { filter: (src, dest) => isNotHiddenFile(src) }))
 
     await processDirectory('pages')
 }
@@ -69,23 +68,28 @@ async function processDirectory(directoryPath) {
 async function develop(port) {
     await build()
     const server = startServer(port)
-    const watcher = chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (path, _) => {
-        console.log(`Detected change in file ${path}.`)
+    const watcher = chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (changed_file_path, _) => {
+        changed_file_path = changed_file_path.split(path.sep).join(path.posix.sep)
+        console.log(`Detected change in file ${changed_file_path}.`)
         if (
-            path.startsWith('static/') ||
-            (path.startsWith('templates/') && !path.endsWith('.html')) ||
-            (path.startsWith('pages/') && !path.endsWith('.md'))
+            changed_file_path.startsWith('static') ||
+            (changed_file_path.startsWith('templates') && !changed_file_path.endsWith('.html')) ||
+            (changed_file_path.startsWith('pages') && !changed_file_path.endsWith('.md'))
         ) {
             await safeExecute(
                 async () =>
-                    await fs.copy(path, `public/${path.substring(path.split('/')[0].length + 1)}`, {
-                        filter: (src, dest) => isNotHiddenFile(src),
-                    })
+                    await fs.copy(
+                        changed_file_path,
+                        `public/${changed_file_path.substring(changed_file_path.split('/')[0].length + 1)}`,
+                        {
+                            filter: (src, dest) => isNotHiddenFile(src),
+                        }
+                    )
             )
-        } else if (path.startsWith('pages/')) {
-            processPage(path)
-        } else if (templateUsageMap.has(path)) {
-            templateUsageMap.get(path).forEach((element) => {
+        } else if (changed_file_path.startsWith('pages')) {
+            processPage(changed_file_path)
+        } else if (templateUsageMap.has(changed_file_path)) {
+            templateUsageMap.get(changed_file_path).forEach((element) => {
                 processPage(element)
             })
         }
@@ -206,5 +210,5 @@ async function safeExecute(func) {
 }
 
 function isNotHiddenFile(src) {
-    return !src.match(/.+\/\..*/)
+    return !src.match(/.+[\/\\]\..*/)
 }
