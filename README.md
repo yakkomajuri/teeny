@@ -145,7 +145,7 @@ author: teeny
     </body>
 </html>
 ```
-the variables int the frontmatter will be inserted into the templete and will result in the following file.
+The variables in the frontmatter will be inserted into the templete. The insert is dumm and just looks for one ore more matches and replaces them all.
 
 ##### public/index.html
 ```html
