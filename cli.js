@@ -36,17 +36,17 @@ async function build() {
     await safeExecute(
         async () =>
             await fs.copy('templates/', 'public/', {
-                filter: (src, dest) => isNotHiddenFile(src, dest) && !src.endsWith('.html'),
+                filter: (src, dest) => isNotHiddenFile(src) && !src.endsWith('.html'),
             })
     )
     await safeExecute(
         async () =>
             await fs.copy('pages/', 'public/', {
-                filter: (src, dest) => isNotHiddenFile(src, dest) && !src.endsWith('.md'),
+                filter: (src, dest) => isNotHiddenFile(src) && !src.endsWith('.md'),
             })
     )
     await safeExecute(
-        async () => await fs.copy('static/', 'public/', { filter: (src, dest) => isNotHiddenFile(src, dest) })
+        async () => await fs.copy('static/', 'public/', { filter: (src, dest) => isNotHiddenFile(src) })
     )
 
     await processDirectory('pages')
@@ -79,7 +79,7 @@ async function develop(port) {
             await safeExecute(
                 async () =>
                     await fs.copy(path, `public/${path.substring(path.split('/')[0].length + 1)}`, {
-                        filter: (src, dest) => isNotHiddenFile(src, dest),
+                        filter: (src, dest) => isNotHiddenFile(src),
                     })
             )
         } else if (path.startsWith('pages/')) {
@@ -205,6 +205,6 @@ async function safeExecute(func) {
     } catch {}
 }
 
-function isNotHiddenFile(src, dest) {
+function isNotHiddenFile(src) {
     return !src.match(/.+\/\..*/)
 }
