@@ -168,4 +168,4 @@ The variables in the frontmatter will be inserted into the templete. The insert 
 
 I want to keep Teeny as tiny as possible. I deliberately put all the code in one file as a reminder to myself that this is supposed to just be a simple tool for me to build simple static blogs quickly.
 
-Add better customization options.
+However, it could use a few "developer experience" upgrades, as well as some better customization options.
