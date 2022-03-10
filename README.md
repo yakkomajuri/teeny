@@ -110,10 +110,62 @@ Later I did surrender to the `static/` directory approach though, as there may b
 
 The last command that Teeny supports is `teeny develop`. This creates an HTTP server to server files from the `public/` subdirectory.
 
-It listens for changes to the files and updates the static files on the fly (naively, by just rebuilding everything each time it detects a change).
+It listens for changes to the files and only builds the files affected by this changes.
+
+## 🤖 Advanced Features
+
+**Replace**
+
+Page specific variables can be specified in the frontmatter and are inserted into the template at places specified using double curly braces. An example of this is used in the `homepage.html` file.
+
+
+##### pages/index.md
+```
+---
+template: homepage
+title: Teeny page
+author: teeny
+---
+
+# Hello World
+```
+
+##### templates/homepage.html
+```html
+<html>
+    <head>
+        <title>{{ title }}</title>
+        <meta name="author" content="{{ author }}" />
+    </head>
+
+    <body>
+        <p>My first Teeny page</p>
+        <div id="page-content"></div>
+        <script type="text/javascript" src="main.js"></script>
+    </body>
+</html>
+```
+The variables in the frontmatter will be inserted into the templete. The insert is dumm and just looks for one ore more matches and replaces them all.
+
+##### public/index.html
+```html
+<html><head>
+        <title>Teeny page</title>
+        <meta name="author" content="teeny">
+    </head>
+
+    <body>
+        <p>My first Teeny page</p>
+        <div id="page-content"><h1 id="hello-world">Hello World</h1>
+</div>
+        <script type="text/javascript" src="main.js"></script>
+    
+
+</body></html>
+```
 
 ## 🔮 Potential future improvements
 
 I want to keep Teeny as tiny as possible. I deliberately put all the code in one file as a reminder to myself that this is supposed to just be a simple tool for me to build simple static blogs quickly.
 
-However, it could use a few "developer experience" upgrades, like an optimized approach to `teeny develop` instead of naively rebuilding everything, as well as some better customization options.
+However, it could use a few "developer experience" upgrades, as well as some better customization options.

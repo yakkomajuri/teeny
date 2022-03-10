@@ -2,10 +2,14 @@
 
 const { JSDOM } = require('jsdom')
 const fs = require('fs-extra')
-const marked = require('marked')
+const { marked } = require('marked')
 const http = require('http')
 const chokidar = require('chokidar')
 const fm = require('front-matter')
+const path = require('path')
+
+const templateUsageMap = new Map() // key = templatePath, value = Set of pagePaths
+const pageUsageMap = new Map() // key = pagePath, value = templatePath
 
 // attributes: { template: "custom.html" }
 // body: "# My normal markdown ..."
@@ -32,12 +36,17 @@ async function build() {
 
     await safeExecute(
         async () =>
-            await fs.copy('templates/', 'public/', { filter: (f) => !f.startsWith('.') && !f.endsWith('.html') })
+            await fs.copy('templates/', 'public/', {
+                filter: (src, dest) => isNotHiddenFile(src) && !src.endsWith('.html'),
+            })
     )
     await safeExecute(
-        async () => await fs.copy('pages/', 'public/', { filter: (f) => !f.startsWith('.') && !f.endsWith('.md') })
+        async () =>
+            await fs.copy('pages/', 'public/', {
+                filter: (src, dest) => isNotHiddenFile(src) && !src.endsWith('.md'),
+            })
     )
-    await safeExecute(async () => await fs.copy('static/', 'public/'), { filter: (f) => !f.startsWith('.') })
+    await safeExecute(async () => await fs.copy('static/', 'public/', { filter: (src, dest) => isNotHiddenFile(src) }))
 
     await processDirectory('pages')
 }
@@ -59,11 +68,31 @@ async function processDirectory(directoryPath) {
 async function develop(port) {
     await build()
     const server = startServer(port)
-    const watcher = chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (path, _) => {
-        console.log(`Detected change in file ${path}. Restarting development server.`)
-        server.close()
-        await watcher.close()
-        await develop(port)
+    const watcher = chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (changed_file_path, _) => {
+        changed_file_path = changed_file_path.split(path.sep).join(path.posix.sep)
+        console.log(`Detected change in file ${changed_file_path}.`)
+        if (
+            changed_file_path.startsWith('static') ||
+            (changed_file_path.startsWith('templates') && !changed_file_path.endsWith('.html')) ||
+            (changed_file_path.startsWith('pages') && !changed_file_path.endsWith('.md'))
+        ) {
+            await safeExecute(
+                async () =>
+                    await fs.copy(
+                        changed_file_path,
+                        `public/${changed_file_path.substring(changed_file_path.split('/')[0].length + 1)}`,
+                        {
+                            filter: (src, dest) => isNotHiddenFile(src),
+                        }
+                    )
+            )
+        } else if (changed_file_path.startsWith('pages')) {
+            processPage(changed_file_path)
+        } else if (templateUsageMap.has(changed_file_path)) {
+            templateUsageMap.get(changed_file_path).forEach((element) => {
+                processPage(element)
+            })
+        }
     })
 }
 
@@ -72,10 +101,11 @@ async function init() {
     await safeExecute(async () => await fs.mkdir('static/'))
     await safeExecute(async () => await fs.mkdir('templates/'))
 
-    const examplePage = `---\ntemplate: homepage\n---\n# Hello World`
-    const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script type="text/javascript" src='main.js'></body></html>`
-    const defaultTemplate = `<html><body><div id='page-content'></div></body></html>`
-    const exampleStaticAssetJs = `console.log('hello world')`
+    const examplePage = `---\ntemplate: homepage\ntitle: Teeny page\nauthor: teeny\n---\n\n# Hello World\n`
+
+    const exampleTemplate = `<html>\n    <head>\n        <title>{{ title }}</title>\n        <meta name="author" content="{{ author }}" />\n    </head>\n\n    <body>\n        <p>My first Teeny page</p>\n        <div id="page-content"></div>\n        <script type="text/javascript" src="main.js"></script>\n    </body>\n</html>\n`
+    const defaultTemplate = `<html>\n    <body>\n        <div id="page-content"></div>\n    </body>\n</html>\n`
+    const exampleStaticAssetJs = `console.log('hello world')\n`
 
     await fs.writeFile('pages/index.md', examplePage)
     await fs.writeFile('templates/homepage.html', exampleTemplate)
@@ -90,8 +120,27 @@ async function processPage(pagePath) {
     if (frontmatter.template) {
         templatePath = `templates/${frontmatter.template}.html`
     }
-    const dom = await JSDOM.fromFile(templatePath)
-    const parsedHtml = marked(markdown)
+
+    if (pageUsageMap.has(pagePath)) {
+        templateUsageMap.get(pageUsageMap.get(pagePath)).delete(pagePath)
+    }
+
+    if (templateUsageMap.has(templatePath)) {
+        templateUsageMap.get(templatePath).add(pagePath)
+    } else {
+        templateUsageMap.set(templatePath, new Set([pagePath]))
+    }
+
+    pageUsageMap.set(pagePath, templatePath)
+
+    let templateString = await fs.readFile(templatePath, 'utf-8')
+
+    for (const key in frontmatter) {
+        templateString = templateString.replaceAll(`{{ ${key} }}`, frontmatter[key])
+    }
+
+    const dom = new JSDOM(templateString)
+    const parsedHtml = marked.parse(markdown)
     const document = dom.window.document
 
     const pageContentElement = document.getElementById('page-content')
@@ -110,16 +159,15 @@ async function processPage(pagePath) {
         process.exit(1)
     }
 
-    let title = frontmatter.title
-    if (!title) {
-        const h1s = document.getElementsByTagName('h1')
-        if (h1s.length) {
-            title = h1s[0].innerHTML
+    if (!document.title || document.title == `{{ title }}`) {
+        if (!frontmatter.title) {
+            const h1s = document.getElementsByTagName('h1')
+            if (h1s.length) {
+                document.title = h1s[0].innerHTML
+            }
+        } else {
+            document.title = frontmatter.title
         }
-    }
-
-    if (title) {
-        document.title = title
     }
 
     const finalHtml = document.getElementsByTagName('html')[0].outerHTML
@@ -127,7 +175,8 @@ async function processPage(pagePath) {
     const pagePathParts = pagePath.replace('pages/', '').split('/')
     const pageName = pagePathParts.pop().split('.md')[0]
     const targetPath = pagePathParts.join('/')
-    await fs.writeFile(`public/${targetPath}/${pageName}.html`, finalHtml)
+    await fs.outputFile(`public/${targetPath}/${pageName}.html`, finalHtml)
+    console.log(`Build public/${targetPath}/${pageName}.html`)
 }
 
 function startServer(port) {
@@ -158,4 +207,8 @@ async function safeExecute(func) {
     try {
         await func()
     } catch {}
+}
+
+function isNotHiddenFile(src) {
+    return !src.match(/.+[\/\\]\..*/)
 }
