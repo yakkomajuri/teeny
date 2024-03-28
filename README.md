@@ -2,6 +2,8 @@
 
 > **⚠️ Disclaimer:** This is a tool I built in a couple of hours to generate my personal blog [yakkomajuri.github.io](https://yakkomajuri.github.io). It doesn't do much right now and probably won't ever.
 
+<a href='https://ko-fi.com/R5R7W88CQ' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi1.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+
 ## 🏃 Quick start
 
 ```shell
