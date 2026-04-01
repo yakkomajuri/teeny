@@ -2,7 +2,7 @@
 
 const { JSDOM } = require('jsdom')
 const fs = require('fs-extra')
-const marked = require('marked')
+const { marked } = require('marked')
 const http = require('http')
 const chokidar = require('chokidar')
 const fm = require('front-matter')
@@ -24,6 +24,7 @@ Commands:
   init              Scaffold a new site (creates pages/, static/, templates/)
   build             Build the site into the public/ directory
   develop [port]    Build and start a dev server with live reload (default port: 8000)
+  version           Show the current version
 
 Options:
   -h, --help        Show this help message`
@@ -42,6 +43,11 @@ switch (command) {
         break
     case 'init':
         init()
+        break
+    case 'version':
+    case '--version':
+    case '-v':
+        console.log(require('./package.json').version)
         break
     default:
         console.log(`Command 'teeny ${command}' does not exist.\n`)
@@ -82,14 +88,24 @@ async function develop(port) {
     await build()
     const server = startServer(port, true)
     let rebuilding = false
-    chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (path) => {
-        if (rebuilding) return
-        rebuilding = true
-        console.log(`Detected change in file ${path}. Rebuilding...`)
-        await build()
-        sseClients.forEach((client) => client.write('data: reload\n\n'))
-        rebuilding = false
-    })
+    let debounceTimer = null
+    chokidar
+        .watch(['pages/', 'static/', 'templates/'], { ignoreInitial: true })
+        .on('change', (path) => {
+            if (rebuilding) return
+            clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(async () => {
+                rebuilding = true
+                console.log(`Detected change in file ${path}. Rebuilding...`)
+                try {
+                    await build()
+                    sseClients.forEach((client) => client.write('data: reload\n\n'))
+                } catch (err) {
+                    console.error('Build failed:', err.message)
+                }
+                setTimeout(() => { rebuilding = false }, 200)
+            }, 100)
+        })
 }
 
 async function init() {
