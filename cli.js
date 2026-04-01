@@ -7,6 +7,10 @@ const http = require('http')
 const chokidar = require('chokidar')
 const fm = require('front-matter')
 
+let sseClients = []
+
+const reloadScript = `<script>new EventSource('/__reload').onmessage=()=>location.reload()</script>`
+
 // attributes: { template: "custom.html" }
 // body: "# My normal markdown ..."
 const scriptArgs = process.argv.slice(2)
@@ -76,12 +80,15 @@ async function processDirectory(directoryPath) {
 
 async function develop(port) {
     await build()
-    const server = startServer(port)
-    const watcher = chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (path, _) => {
-        console.log(`Detected change in file ${path}. Restarting development server.`)
-        server.close()
-        await watcher.close()
-        await develop(port)
+    const server = startServer(port, true)
+    let rebuilding = false
+    chokidar.watch(['pages/', 'static/', 'templates/']).on('change', async (path) => {
+        if (rebuilding) return
+        rebuilding = true
+        console.log(`Detected change in file ${path}. Rebuilding...`)
+        await build()
+        sseClients.forEach((client) => client.write('data: reload\n\n'))
+        rebuilding = false
     })
 }
 
@@ -148,11 +155,25 @@ async function processPage(pagePath) {
     await fs.writeFile(`public/${targetPath}/${pageName}.html`, finalHtml)
 }
 
-function startServer(port) {
+function startServer(port, hotReload) {
     console.log(`Development server starting on http://localhost:${port}`)
     return http
         .createServer(function (req, res) {
             const url = req.url
+
+            if (hotReload && url === '/__reload') {
+                res.writeHead(200, {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    Connection: 'keep-alive',
+                })
+                sseClients.push(res)
+                req.on('close', () => {
+                    sseClients = sseClients.filter((c) => c !== res)
+                })
+                return
+            }
+
             let filePath = url
             if (url === '/') {
                 filePath = '/index.html'
@@ -164,6 +185,9 @@ function startServer(port) {
                     res.writeHead(404)
                     res.end('<h1>404: Page not found</h1>')
                     return
+                }
+                if (hotReload && filePath.endsWith('.html')) {
+                    data = data.toString().replace('</body>', reloadScript + '</body>')
                 }
                 res.writeHead(200)
                 res.end(data)
