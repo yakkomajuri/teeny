@@ -12,6 +12,23 @@ const fm = require('front-matter')
 const scriptArgs = process.argv.slice(2)
 const command = scriptArgs[0]
 
+const helpText = `teeny - a very simple static site generator
+
+Usage: teeny <command> [options]
+
+Commands:
+  init              Scaffold a new site (creates pages/, static/, templates/)
+  build             Build the site into the public/ directory
+  develop [port]    Build and start a dev server with live reload (default port: 8000)
+
+Options:
+  -h, --help        Show this help message`
+
+if (!command || command === '--help' || command === '-h') {
+    console.log(helpText)
+    process.exit(0)
+}
+
 switch (command) {
     case 'build':
         build()
@@ -23,7 +40,8 @@ switch (command) {
         init()
         break
     default:
-        console.log(`Command 'teeny ${command}' does not exist.`)
+        console.log(`Command 'teeny ${command}' does not exist.\n`)
+        console.log(helpText)
         process.exit(1)
 }
 
