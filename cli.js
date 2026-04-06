@@ -6,6 +6,7 @@ const { marked } = require('marked')
 const http = require('http')
 const chokidar = require('chokidar')
 const fm = require('front-matter')
+const path = require('path')
 
 let sseClients = []
 
@@ -51,14 +52,56 @@ const commandToHelpString = {
     init: initHelpString,
     build: buildHelpString,
     develop: developHelpString,
-    version: versionHelpString
+    version: versionHelpString,
 }
+
+const defaultTeenyConfig = `
+module.exports = {
+    plugins: []
+}`
 
 const helpArgs = ['-h', '--help']
 
 const DEFAULT_PORT = 8000
 
-async function build() {
+async function init() {
+    await safeExecute(async () => await fs.mkdir('pages/'))
+    await safeExecute(async () => await fs.mkdir('static/'))
+    await safeExecute(async () => await fs.mkdir('templates/'))
+
+    const examplePage = `---\ntemplate: homepage\n---\n# Hello World`
+    const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script type="text/javascript" src='main.js'></body></html>`
+    const defaultTemplate = `<html><body><div id='page-content'></div></body></html>`
+    const exampleStaticAssetJs = `console.log('hello world')`
+
+    await fs.writeFile('pages/index.md', examplePage)
+    await fs.writeFile('templates/homepage.html', exampleTemplate)
+    await fs.writeFile('templates/default.html', defaultTemplate)
+    await fs.writeFile('static/main.js', exampleStaticAssetJs)
+    await fs.writeFile('teeny.config.js', defaultTeenyConfig)
+}
+
+async function build({ isDevelop } = { isDevelop: false }) {
+    let config = {}
+    try {
+        console.log('pwd', process.cwd())
+        const configPath = path.resolve(process.cwd(), 'teeny.config.js')
+        if (!fs.exists(configPath)) {
+            console.warn('[WARNING] Could not load teeny.config.js file. Proceeding to build without plugins.')
+        } else {
+            config = require(configPath)
+        }
+    } catch (e) {
+        console.error('[ERROR] Error loading teeny.config.js\n')
+        throw e
+    }
+
+    const plugins = config.skipPluginsOnDevelop && isDevelop ? [] : config.plugins || []
+
+    // we don't want verbose output on isDevelop as it could be too much noise
+    // can reconsider this and make it a config option in the future
+    const verboseMode = config.verboseBuild && !isDevelop
+
     await fs.emptyDir('public/')
 
     await safeExecute(
@@ -70,24 +113,36 @@ async function build() {
     )
     await safeExecute(async () => await fs.copy('static/', 'public/'), { filter: (f) => !f.startsWith('.') })
 
-    await processDirectory('pages')
-}
+    await processDirectory('pages', plugins, verboseMode)
 
-async function processDirectory(directoryPath) {
-    let contents = await fs.readdir(`${directoryPath}/`)
-    const processPagePromises = []
-    for (const element of contents) {
-        const isDirectory = (await fs.lstat(`${directoryPath}/${element}`)).isDirectory()
-        if (isDirectory) {
-            await processDirectory(`${directoryPath}/${element}`, processPagePromises)
+    for (const plugin of plugins) {
+        if (!('onBuildComplete' in plugin)) {
             continue
         }
-        processPagePromises.push(processPage(`${directoryPath}/${element}`))
+
+        if (verboseMode) {
+            console.info(`Running onBuildComplete for plugin: ${plugin.name} (v${plugin.version})`)
+        }
+        plugin.onBuildComplete(fs, path.resolve(process.cwd(), 'public'))
+    }
+}
+
+async function processDirectory(directoryPath, plugins, verboseMode) {
+    let contents = await fs.readdir(`${directoryPath}/`)
+    const processPagePromises = []
+    for (const fileOrDirPath of contents) {
+        const fullPath = `${directoryPath}/${fileOrDirPath}`
+        const isDirectory = (await fs.lstat(fullPath)).isDirectory()
+        if (isDirectory) {
+            await processDirectory(fullPath)
+            continue
+        }
+        processPagePromises.push(processPage(fullPath, plugins, verboseMode))
     }
     await Promise.all(processPagePromises)
 }
 
-async function processPage(pagePath) {
+async function processPage(pagePath, plugins, verboseMode) {
     let templatePath = 'templates/default.html'
     const fileData = await fs.readFile(pagePath, 'utf-8')
     const { attributes: frontmatter, body: markdown } = await fm(fileData)
@@ -103,14 +158,14 @@ async function processPage(pagePath) {
     if (pageContentElement) {
         pageContentElement.innerHTML = parsedHtml
     } else {
-        console.log(
-            `Could not find element with id 'page-content' in template ${templatePath}. Generating page without markdown content.`
+        console.warn(
+            `[WARNING] Could not find element with id 'page-content' in template ${templatePath}. Generating page without markdown content.`
         )
     }
 
     const wrapperHtmlElement = document.getElementsByTagName('html')
     if (!wrapperHtmlElement.length) {
-        console.log(`Templates should contain the 'html' tag.`)
+        console.error(`Templates should contain the 'html' tag.`)
         process.exit(1)
     }
 
@@ -127,6 +182,17 @@ async function processPage(pagePath) {
     }
 
     const finalHtml = document.getElementsByTagName('html')[0].outerHTML
+
+    for (const plugin of plugins) {
+        if (!('onPage' in plugin)) {
+            continue
+        }
+
+        if (verboseMode) {
+            console.info(`Running onPage for plugin: ${plugin.name} (v${plugin.version})`)
+        }
+        plugin.onPage({ pagePath, frontmatter, document, markdown })
+    }
 
     const pagePathParts = pagePath.replace('pages/', '').split('/')
     const pageName = pagePathParts.pop().split('.md')[0]
@@ -151,53 +217,36 @@ async function develop(commandArgs) {
         process.exit(1)
     }
 
-    await build()
+    await build({ isDevelop: true })
 
     startServer(port, true)
 
     let rebuilding = false
     let debounceTimer = null
-    chokidar
-        .watch(['pages/', 'static/', 'templates/'], { ignoreInitial: true })
-        .on('change', (path) => {
-            if (rebuilding) return
-            clearTimeout(debounceTimer)
-            debounceTimer = setTimeout(async () => {
-                rebuilding = true
-                console.log(`Detected change in file ${path}. Rebuilding...`)
-                try {
-                    await build()
-                    sseClients.forEach((client) => client.write('data: reload\n\n'))
-                } catch (err) {
-                    console.error('Build failed:', err.message)
-                }
-                setTimeout(() => { rebuilding = false }, 200)
-            }, 100)
-        })
+    chokidar.watch(['pages/', 'static/', 'templates/'], { ignoreInitial: true }).on('change', (path) => {
+        if (rebuilding) return
+        clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(async () => {
+            rebuilding = true
+            console.log(`Detected change in file ${path}. Rebuilding...`)
+            try {
+                await build()
+                sseClients.forEach((client) => client.write('data: reload\n\n'))
+            } catch (err) {
+                console.error('Build failed:', err.message)
+            }
+            setTimeout(() => {
+                rebuilding = false
+            }, 200)
+        }, 100)
+    })
 }
-
-async function init() {
-    await safeExecute(async () => await fs.mkdir('pages/'))
-    await safeExecute(async () => await fs.mkdir('static/'))
-    await safeExecute(async () => await fs.mkdir('templates/'))
-
-    const examplePage = `---\ntemplate: homepage\n---\n# Hello World`
-    const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script type="text/javascript" src='main.js'></body></html>`
-    const defaultTemplate = `<html><body><div id='page-content'></div></body></html>`
-    const exampleStaticAssetJs = `console.log('hello world')`
-
-    await fs.writeFile('pages/index.md', examplePage)
-    await fs.writeFile('templates/homepage.html', exampleTemplate)
-    await fs.writeFile('templates/default.html', defaultTemplate)
-    await fs.writeFile('static/main.js', exampleStaticAssetJs)
-}
-
 
 function startServer(port, hotReload) {
     console.log(`Development server starting on http://localhost:${port}`)
 
-    // we're not adding an onerror event handler to server because most errors 
-    // from process exits originating from the server will be more useful than 
+    // we're not adding an onerror event handler to server because most errors
+    // from process exits originating from the server will be more useful than
     // the info we can provide.
     // the most common error will be port already in use and the traceback makes that clear
     return http
@@ -245,8 +294,6 @@ async function safeExecute(func) {
     } catch {}
 }
 
-
-
 function main() {
     // attributes: { template: "custom.html" }
     // body: "# My normal markdown ..."
@@ -283,9 +330,6 @@ function main() {
         case 'develop':
             develop(commandArgs)
             break
-        case 'plugins':
-            plugins()
-            break
         case 'version':
         case '--version':
         case '-v':
@@ -296,7 +340,6 @@ function main() {
             console.log(mainHelpString)
             process.exit(1)
     }
-
 }
 
 main()

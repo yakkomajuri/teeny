@@ -1,8 +1,10 @@
-# Teeny: A simple static site generator
+# Teeny: A tiny static site generator
 
-> **⚠️ Disclaimer:** This is a tool I built in a couple of hours to generate my personal blog [yakkomajuri.github.io](https://yakkomajuri.github.io). It doesn't do much right now and probably won't ever.
+Teeny is a static site generator written in 350 lines of plain JavaScript. You can easily understand exactly how it works and you can launch a blog in 5 minutes.
 
-<a href='https://ko-fi.com/R5R7W88CQ' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi1.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+If you need more, you can use plugins to extend functionality.
+
+Teeny was originally built over a couple of hours (pre-AI) because I wanted something simple. You can [read that story on my blog](https://blog.yakkomajuri.com/blog/teeny).
 
 ## 🏃 Quick start
 
@@ -12,10 +14,6 @@ teeny init && teeny develop
 ```
 
 For an example of a project using Teeny, check out my [personal blog's repo](https://github.com/yakkomajuri/yakkomajuri.github.io).
-
-## 📖 Backstory
-
-You can read about my motivation for building Teeny on [this blog post titled "Why I built my own static site generator"](https://yakkomajuri.github.io/blog/teeny).
 
 ## 💻 Supported commands
 
@@ -114,8 +112,34 @@ The last command that Teeny supports is `teeny develop`. This creates an HTTP se
 
 It listens for changes to the files and updates the static files on the fly (naively, by just rebuilding everything each time it detects a change).
 
-## 🔮 Potential future improvements
+## Plugins
 
-I want to keep Teeny as tiny as possible. I deliberately put all the code in one file as a reminder to myself that this is supposed to just be a simple tool for me to build simple static blogs quickly.
+You can extend Teeny's functionality by using plugins.
 
-However, it could use a few "developer experience" upgrades, like an optimized approach to `teeny develop` instead of naively rebuilding everything, as well as some better customization options.
+A plugin looks like this:
+
+```js
+module.exports = function rssPlugin(config = {}) {
+    const {
+        siteUrl = '',
+        title = 'RSS Feed',
+        description = '',
+        outputPath = 'feed.xml',
+    } = config
+
+    const items = []
+
+    return {
+        name: 'test-plugin',
+        version: '1.0.0',
+        onPage: ({ pagePath, frontmatter, document, markdown }) => {
+            // runs for every page built
+            // allows you to change content in a page or use the content for e.g. making an RSS feed
+        },
+        onBuildComplete: (fs, outputDir) => {
+            // runs after all pages have been built and the public/ directory populated
+            // let's you write new files like an RSS feed or a JSON index to the final build
+        },
+    }
+}
+```
