@@ -11,54 +11,53 @@ let sseClients = []
 
 const reloadScript = `<script>new EventSource('/__reload').onmessage=()=>location.reload()</script>`
 
-const helpText = `teeny - a very simple static site generator
+const mainHelpString = `teeny - a very simple static site generator
 
 Usage: teeny <command> [options]
 
 Commands:
-  init              Scaffold a new site (creates pages/, static/, templates/)
-  build             Build the site into the public/ directory
-  develop [port]    Build and start a dev server with live reload (default port: 8000)
-  version           Show the current version
+  init                Initializes a new teeny project (creates pages/, static/, templates/)
+  build               Builds the teeny project and outputs all static files to ./public/
+  develop [-p PORT]   Runs a development server with hot reloading to serve your site's files (default port: 8000)
+  version             Show the current version
 
 Options:
-  -h, --help        Show this help message`
+  -h, --help        Show this help message
+`
 
+const initHelpString = `Usage: teeny init
 
+Initializes a new hello world teeny project ready to use (creates pages/, static/, templates/)
+`
 
+const buildHelpString = `Usage: teeny build
 
+Builds the teeny project and outputs all static files to ./public/
+`
 
-function main() {
-    // attributes: { template: "custom.html" }
-    // body: "# My normal markdown ..."
-    const scriptArgs = process.argv.slice(2)
-    const command = scriptArgs[0]
-    if (!command || command === '--help' || command === '-h') {
-        console.log(helpText)
-        process.exit(0)
-    }
+const developHelpString = `Usage: teeny develop [-p PORT]
 
-    switch (command) {
-        case 'build':
-            build()
-            break
-        case 'develop':
-            develop(scriptArgs[1] ? Number(scriptArgs[1]) : 8000)
-            break
-        case 'init':
-            init()
-            break
-        case 'version':
-        case '--version':
-        case '-v':
-            console.log(require('./package.json').version)
-            break
-        default:
-            console.log(`Command 'teeny ${command}' does not exist.\n`)
-            console.log(helpText)
-            process.exit(1)
-    }
+Runs a development server with hot reloading to serve your site's files.
+
+    -p, --port     port to run the server on (default: 8000)
+`
+
+const versionHelpString = `Usage: teeny version
+
+Shows the current version
+`
+
+const commandToHelpString = {
+    init: initHelpString,
+    build: buildHelpString,
+    develop: developHelpString,
+    version: versionHelpString
 }
+
+const helpArgs = ['-h', '--help']
+
+const DEFAULT_PORT = 8000
+
 
 async function build() {
     await fs.emptyDir('public/')
@@ -221,6 +220,49 @@ async function safeExecute(func) {
     try {
         await func()
     } catch {}
+}
+
+
+
+function main() {
+    // attributes: { template: "custom.html" }
+    // body: "# My normal markdown ..."
+    const scriptArgs = process.argv.slice(2)
+    const command = scriptArgs[0]
+    const commandArgs = scriptArgs.slice(1)
+
+    if (!command || helpArgs.includes(command)) {
+        console.log(mainHelpString)
+        process.exit(0)
+    }
+
+    const isRequestingCommandHelp = commandArgs.length > 0 && helpArgs.includes(commandArgs[0])
+    if (isRequestingCommandHelp) {
+        console.log(commandToHelpString[command] || mainHelpString)
+        return
+    }
+
+    switch (command) {
+        case 'build':
+            build()
+            break
+        case 'develop':
+            develop(scriptArgs[1] ? Number(scriptArgs[1]) : DEFAULT_PORT)
+            break
+        case 'init':
+            init()
+            break
+        case 'version':
+        case '--version':
+        case '-v':
+            console.log(require('./package.json').version)
+            break
+        default:
+            console.log(`Command 'teeny ${command}' does not exist.\n`)
+            console.log(mainHelpString)
+            process.exit(1)
+    }
+
 }
 
 main()
