@@ -88,9 +88,25 @@ async function processDirectory(directoryPath) {
     await Promise.all(processPagePromises)
 }
 
-async function develop(port) {
+async function develop(commandArgs) {
+    let port
+    if (!commandArgs || commandArgs.length === 0) {
+        port = DEFAULT_PORT
+    } else if (commandArgs.length !== 2 || !['-p', '--port'].includes(commandArgs[0])) {
+        // either accept 0 or two args
+        console.error(`Invalid command: teeny develop ${commandArgs.join(' ')}\n${commandToHelpString['develop']}`)
+        process.exit(1)
+    } else {
+        port = Number(commandArgs[1])
+    }
+
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+        console.error(`Invalid port: ${port}. The selected port must be an integer between 1024–65535.`)
+        process.exit(1)
+    }
+
     await build()
-    const server = startServer(port, true)
+    startServer(port, true)
     let rebuilding = false
     let debounceTimer = null
     chokidar
@@ -244,12 +260,20 @@ function main() {
 
     switch (command) {
         case 'build':
+            if (commandArgs.length > 0) {
+                console.error(`Invalid command: teeny ${scriptArgs.join(' ')}\n${commandToHelpString['build']}`)
+                process.exit(1)
+            }
             build()
             break
         case 'develop':
-            develop(scriptArgs[1] ? Number(scriptArgs[1]) : DEFAULT_PORT)
+            develop(commandArgs)
             break
         case 'init':
+            if (commandArgs.length > 0) {
+                console.error(`Invalid command: teeny ${scriptArgs.join(' ')}\n${commandToHelpString['init']}`)
+                process.exit(1)
+            }
             init()
             break
         case 'version':
