@@ -9,6 +9,7 @@ module.exports = function rssPlugin(config = {}) {
     const items = []
 
     return {
+        name: 'test-plugin',
         version: '1.0.0',
         onPage: ({ pagePath, frontmatter, document }) => {
             const urlPath = pagePath.replace(/^pages/, '').replace(/\.md$/, '.html')

@@ -52,7 +52,7 @@ const commandToHelpString = {
     init: initHelpString,
     build: buildHelpString,
     develop: developHelpString,
-    version: versionHelpString
+    version: versionHelpString,
 }
 
 const defaultTeenyConfig = `
@@ -81,10 +81,10 @@ async function init() {
     await fs.writeFile('teeny.config.js', defaultTeenyConfig)
 }
 
-async function build() {
+async function build({ isDevelop } = { isDevelop: false }) {
     let config = {}
     try {
-        console.log('pwd', process.cwd()    )
+        console.log('pwd', process.cwd())
         const configPath = path.resolve(process.cwd(), 'teeny.config.js')
         if (!fs.exists(configPath)) {
             console.warn('[WARNING] Could not load teeny.config.js file. Proceeding to build without plugins.')
@@ -98,6 +98,10 @@ async function build() {
 
     const plugins = config.plugins || []
 
+    // we don't want verbose output on isDevelop as it could be too much noise
+    // can reconsider this and make it a config option in the future
+    const verboseMode = config.verboseBuild && !isDevelop
+
     await fs.emptyDir('public/')
 
     await safeExecute(
@@ -109,14 +113,21 @@ async function build() {
     )
     await safeExecute(async () => await fs.copy('static/', 'public/'), { filter: (f) => !f.startsWith('.') })
 
-    await processDirectory('pages', plugins)
+    await processDirectory('pages', plugins, verboseMode)
 
     for (const plugin of plugins) {
+        if (!('onBuildComplete' in plugin)) {
+            continue
+        }
+
+        if (verboseMode) {
+            console.info(`Running onBuildComplete for plugin: ${plugin.name} (v${plugin.version})`)
+        }
         plugin.onBuildComplete(fs, path.resolve(process.cwd(), 'public'))
     }
 }
 
-async function processDirectory(directoryPath, plugins) {
+async function processDirectory(directoryPath, plugins, verboseMode) {
     let contents = await fs.readdir(`${directoryPath}/`)
     const processPagePromises = []
     for (const fileOrDirPath of contents) {
@@ -126,12 +137,12 @@ async function processDirectory(directoryPath, plugins) {
             await processDirectory(fullPath)
             continue
         }
-        processPagePromises.push(processPage(fullPath, plugins))
+        processPagePromises.push(processPage(fullPath, plugins, verboseMode))
     }
     await Promise.all(processPagePromises)
 }
 
-async function processPage(pagePath, plugins) {
+async function processPage(pagePath, plugins, verboseMode) {
     let templatePath = 'templates/default.html'
     const fileData = await fs.readFile(pagePath, 'utf-8')
     const { attributes: frontmatter, body: markdown } = await fm(fileData)
@@ -151,8 +162,6 @@ async function processPage(pagePath, plugins) {
             `[WARNING] Could not find element with id 'page-content' in template ${templatePath}. Generating page without markdown content.`
         )
     }
-
-
 
     const wrapperHtmlElement = document.getElementsByTagName('html')
     if (!wrapperHtmlElement.length) {
@@ -175,6 +184,13 @@ async function processPage(pagePath, plugins) {
     const finalHtml = document.getElementsByTagName('html')[0].outerHTML
 
     for (const plugin of plugins) {
+        if (!('onPage' in plugin)) {
+            continue
+        }
+
+        if (verboseMode) {
+            console.info(`Running onPage for plugin: ${plugin.name} (v${plugin.version})`)
+        }
         plugin.onPage({ pagePath, frontmatter, document, markdown })
     }
 
@@ -201,37 +217,36 @@ async function develop(commandArgs) {
         process.exit(1)
     }
 
-    await build()
+    await build({ isDevelop: true })
 
     startServer(port, true)
 
     let rebuilding = false
     let debounceTimer = null
-    chokidar
-        .watch(['pages/', 'static/', 'templates/'], { ignoreInitial: true })
-        .on('change', (path) => {
-            if (rebuilding) return
-            clearTimeout(debounceTimer)
-            debounceTimer = setTimeout(async () => {
-                rebuilding = true
-                console.log(`Detected change in file ${path}. Rebuilding...`)
-                try {
-                    await build()
-                    sseClients.forEach((client) => client.write('data: reload\n\n'))
-                } catch (err) {
-                    console.error('Build failed:', err.message)
-                }
-                setTimeout(() => { rebuilding = false }, 200)
-            }, 100)
-        })
+    chokidar.watch(['pages/', 'static/', 'templates/'], { ignoreInitial: true }).on('change', (path) => {
+        if (rebuilding) return
+        clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(async () => {
+            rebuilding = true
+            console.log(`Detected change in file ${path}. Rebuilding...`)
+            try {
+                await build()
+                sseClients.forEach((client) => client.write('data: reload\n\n'))
+            } catch (err) {
+                console.error('Build failed:', err.message)
+            }
+            setTimeout(() => {
+                rebuilding = false
+            }, 200)
+        }, 100)
+    })
 }
-
 
 function startServer(port, hotReload) {
     console.log(`Development server starting on http://localhost:${port}`)
 
-    // we're not adding an onerror event handler to server because most errors 
-    // from process exits originating from the server will be more useful than 
+    // we're not adding an onerror event handler to server because most errors
+    // from process exits originating from the server will be more useful than
     // the info we can provide.
     // the most common error will be port already in use and the traceback makes that clear
     return http
@@ -279,8 +294,6 @@ async function safeExecute(func) {
     } catch {}
 }
 
-
-
 function main() {
     // attributes: { template: "custom.html" }
     // body: "# My normal markdown ..."
@@ -327,7 +340,6 @@ function main() {
             console.log(mainHelpString)
             process.exit(1)
     }
-
 }
 
 main()

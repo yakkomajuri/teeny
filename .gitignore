@@ -5,5 +5,6 @@ node_modules/
 /templates/
 /static/
 /test/
+
 public/
 ignore/
