@@ -1,8 +1,9 @@
 yarn-error.log
 teeny-*.tgz 
 node_modules/
-pages/
+/pages/
+/templates/
+/static/
+/test/
 public/
-templates/
-static/
-test/
+ignore/

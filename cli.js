@@ -6,6 +6,7 @@ const { marked } = require('marked')
 const http = require('http')
 const chokidar = require('chokidar')
 const fm = require('front-matter')
+const path = require('path')
 
 let sseClients = []
 
@@ -42,14 +43,6 @@ Runs a development server with hot reloading to serve your site's files.
     -p, --port     port to run the server on (default: 8000)
 `
 
-const pluginsHelpString = `Usage: teeny plugins <list|install|delete|update>
-
-    list                             List installed plugins
-    install <repo_url>               Install a plugin from a Git repo URL
-    delete <repo_url|plugin_name>    Uninstall a plugin by repo URL or plugin name
-    update <repo_url|plugin_name>    Update a plugin to the latest version
-`
-
 const versionHelpString = `Usage: teeny version
 
 Shows the current version
@@ -59,9 +52,13 @@ const commandToHelpString = {
     init: initHelpString,
     build: buildHelpString,
     develop: developHelpString,
-    plugins: pluginsHelpString,
     version: versionHelpString
 }
+
+const defaultTeenyConfig = `
+module.exports = {
+    plugins: []
+}`
 
 const helpArgs = ['-h', '--help']
 
@@ -81,9 +78,26 @@ async function init() {
     await fs.writeFile('templates/homepage.html', exampleTemplate)
     await fs.writeFile('templates/default.html', defaultTemplate)
     await fs.writeFile('static/main.js', exampleStaticAssetJs)
+    await fs.writeFile('teeny.config.js', defaultTeenyConfig)
 }
 
 async function build() {
+    let config = {}
+    try {
+        console.log('pwd', process.cwd()    )
+        const configPath = path.resolve(process.cwd(), 'teeny.config.js')
+        if (!fs.exists(configPath)) {
+            console.warn('[WARNING] Could not load teeny.config.js file. Proceeding to build without plugins.')
+        } else {
+            config = require(configPath)
+        }
+    } catch (e) {
+        console.error('[ERROR] Error loading teeny.config.js\n')
+        throw e
+    }
+
+    const plugins = config.plugins || []
+
     await fs.emptyDir('public/')
 
     await safeExecute(
@@ -95,24 +109,29 @@ async function build() {
     )
     await safeExecute(async () => await fs.copy('static/', 'public/'), { filter: (f) => !f.startsWith('.') })
 
-    await processDirectory('pages')
+    await processDirectory('pages', plugins)
+
+    for (const plugin of plugins) {
+        plugin.onBuildComplete(fs, path.resolve(process.cwd(), 'public'))
+    }
 }
 
-async function processDirectory(directoryPath) {
+async function processDirectory(directoryPath, plugins) {
     let contents = await fs.readdir(`${directoryPath}/`)
     const processPagePromises = []
-    for (const element of contents) {
-        const isDirectory = (await fs.lstat(`${directoryPath}/${element}`)).isDirectory()
+    for (const fileOrDirPath of contents) {
+        const fullPath = `${directoryPath}/${fileOrDirPath}`
+        const isDirectory = (await fs.lstat(fullPath)).isDirectory()
         if (isDirectory) {
-            await processDirectory(`${directoryPath}/${element}`, processPagePromises)
+            await processDirectory(fullPath)
             continue
         }
-        processPagePromises.push(processPage(`${directoryPath}/${element}`))
+        processPagePromises.push(processPage(fullPath, plugins))
     }
     await Promise.all(processPagePromises)
 }
 
-async function processPage(pagePath) {
+async function processPage(pagePath, plugins) {
     let templatePath = 'templates/default.html'
     const fileData = await fs.readFile(pagePath, 'utf-8')
     const { attributes: frontmatter, body: markdown } = await fm(fileData)
@@ -128,14 +147,16 @@ async function processPage(pagePath) {
     if (pageContentElement) {
         pageContentElement.innerHTML = parsedHtml
     } else {
-        console.log(
-            `Could not find element with id 'page-content' in template ${templatePath}. Generating page without markdown content.`
+        console.warn(
+            `[WARNING] Could not find element with id 'page-content' in template ${templatePath}. Generating page without markdown content.`
         )
     }
 
+
+
     const wrapperHtmlElement = document.getElementsByTagName('html')
     if (!wrapperHtmlElement.length) {
-        console.log(`Templates should contain the 'html' tag.`)
+        console.error(`Templates should contain the 'html' tag.`)
         process.exit(1)
     }
 
@@ -152,6 +173,10 @@ async function processPage(pagePath) {
     }
 
     const finalHtml = document.getElementsByTagName('html')[0].outerHTML
+
+    for (const plugin of plugins) {
+        plugin.onPage({ pagePath, frontmatter, document, markdown })
+    }
 
     const pagePathParts = pagePath.replace('pages/', '').split('/')
     const pageName = pagePathParts.pop().split('.md')[0]
@@ -201,27 +226,6 @@ async function develop(commandArgs) {
         })
 }
 
-
-function plugins(commandArgs) {
-    if (commandArgs.length === 0 || commandArgs.length > 2) {
-        console.error(`Invalid command: teeny plugins ${commandArgs.join(' ')}\n${commandToHelpString['plugins']}`)
-    }
-
-    const pluginsSubcommand = commandArgs[0]
-
-    switch (pluginsSubcommand) {
-        case 'list':
-            break
-        case 'install':
-            break
-        case 'update':
-            break
-        case 'delete':
-            break
-    }
-
-
-}
 
 function startServer(port, hotReload) {
     console.log(`Development server starting on http://localhost:${port}`)
@@ -312,9 +316,6 @@ function main() {
             break
         case 'develop':
             develop(commandArgs)
-            break
-        case 'plugins':
-            plugins(commandArgs)
             break
         case 'version':
         case '--version':
