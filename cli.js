@@ -42,6 +42,14 @@ Runs a development server with hot reloading to serve your site's files.
     -p, --port     port to run the server on (default: 8000)
 `
 
+const pluginsHelpString = `Usage: teeny plugins <list|install|delete|update>
+
+    list                             List installed plugins
+    install <repo_url>               Install a plugin from a Git repo URL
+    delete <repo_url|plugin_name>    Uninstall a plugin by repo URL or plugin name
+    update <repo_url|plugin_name>    Update a plugin to the latest version
+`
+
 const versionHelpString = `Usage: teeny version
 
 Shows the current version
@@ -51,12 +59,29 @@ const commandToHelpString = {
     init: initHelpString,
     build: buildHelpString,
     develop: developHelpString,
+    plugins: pluginsHelpString,
     version: versionHelpString
 }
 
 const helpArgs = ['-h', '--help']
 
 const DEFAULT_PORT = 8000
+
+async function init() {
+    await safeExecute(async () => await fs.mkdir('pages/'))
+    await safeExecute(async () => await fs.mkdir('static/'))
+    await safeExecute(async () => await fs.mkdir('templates/'))
+
+    const examplePage = `---\ntemplate: homepage\n---\n# Hello World`
+    const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script type="text/javascript" src='main.js'></body></html>`
+    const defaultTemplate = `<html><body><div id='page-content'></div></body></html>`
+    const exampleStaticAssetJs = `console.log('hello world')`
+
+    await fs.writeFile('pages/index.md', examplePage)
+    await fs.writeFile('templates/homepage.html', exampleTemplate)
+    await fs.writeFile('templates/default.html', defaultTemplate)
+    await fs.writeFile('static/main.js', exampleStaticAssetJs)
+}
 
 async function build() {
     await fs.emptyDir('public/')
@@ -176,22 +201,27 @@ async function develop(commandArgs) {
         })
 }
 
-async function init() {
-    await safeExecute(async () => await fs.mkdir('pages/'))
-    await safeExecute(async () => await fs.mkdir('static/'))
-    await safeExecute(async () => await fs.mkdir('templates/'))
 
-    const examplePage = `---\ntemplate: homepage\n---\n# Hello World`
-    const exampleTemplate = `<html><body><p>My first Teeny page</p><div id='page-content'></div><script type="text/javascript" src='main.js'></body></html>`
-    const defaultTemplate = `<html><body><div id='page-content'></div></body></html>`
-    const exampleStaticAssetJs = `console.log('hello world')`
+function plugins(commandArgs) {
+    if (commandArgs.length === 0 || commandArgs.length > 2) {
+        console.error(`Invalid command: teeny plugins ${commandArgs.join(' ')}\n${commandToHelpString['plugins']}`)
+    }
 
-    await fs.writeFile('pages/index.md', examplePage)
-    await fs.writeFile('templates/homepage.html', exampleTemplate)
-    await fs.writeFile('templates/default.html', defaultTemplate)
-    await fs.writeFile('static/main.js', exampleStaticAssetJs)
+    const pluginsSubcommand = commandArgs[0]
+
+    switch (pluginsSubcommand) {
+        case 'list':
+            break
+        case 'install':
+            break
+        case 'update':
+            break
+        case 'delete':
+            break
+    }
+
+
 }
-
 
 function startServer(port, hotReload) {
     console.log(`Development server starting on http://localhost:${port}`)
@@ -284,7 +314,7 @@ function main() {
             develop(commandArgs)
             break
         case 'plugins':
-            plugins()
+            plugins(commandArgs)
             break
         case 'version':
         case '--version':
