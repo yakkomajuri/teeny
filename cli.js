@@ -106,7 +106,9 @@ async function develop(commandArgs) {
     }
 
     await build()
+
     startServer(port, true)
+
     let rebuilding = false
     let debounceTimer = null
     chokidar
@@ -193,6 +195,11 @@ async function processPage(pagePath) {
 
 function startServer(port, hotReload) {
     console.log(`Development server starting on http://localhost:${port}`)
+
+    // we're not adding an onerror event handler to server because most errors 
+    // from process exits originating from the server will be more useful than 
+    // the info we can provide.
+    // the most common error will be port already in use and the traceback makes that clear
     return http
         .createServer(function (req, res) {
             const url = req.url
