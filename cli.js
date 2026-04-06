@@ -11,11 +11,6 @@ let sseClients = []
 
 const reloadScript = `<script>new EventSource('/__reload').onmessage=()=>location.reload()</script>`
 
-// attributes: { template: "custom.html" }
-// body: "# My normal markdown ..."
-const scriptArgs = process.argv.slice(2)
-const command = scriptArgs[0]
-
 const helpText = `teeny - a very simple static site generator
 
 Usage: teeny <command> [options]
@@ -29,30 +24,40 @@ Commands:
 Options:
   -h, --help        Show this help message`
 
-if (!command || command === '--help' || command === '-h') {
-    console.log(helpText)
-    process.exit(0)
-}
 
-switch (command) {
-    case 'build':
-        build()
-        break
-    case 'develop':
-        develop(scriptArgs[1] ? Number(scriptArgs[1]) : 8000)
-        break
-    case 'init':
-        init()
-        break
-    case 'version':
-    case '--version':
-    case '-v':
-        console.log(require('./package.json').version)
-        break
-    default:
-        console.log(`Command 'teeny ${command}' does not exist.\n`)
+
+
+
+function main() {
+    // attributes: { template: "custom.html" }
+    // body: "# My normal markdown ..."
+    const scriptArgs = process.argv.slice(2)
+    const command = scriptArgs[0]
+    if (!command || command === '--help' || command === '-h') {
         console.log(helpText)
-        process.exit(1)
+        process.exit(0)
+    }
+
+    switch (command) {
+        case 'build':
+            build()
+            break
+        case 'develop':
+            develop(scriptArgs[1] ? Number(scriptArgs[1]) : 8000)
+            break
+        case 'init':
+            init()
+            break
+        case 'version':
+        case '--version':
+        case '-v':
+            console.log(require('./package.json').version)
+            break
+        default:
+            console.log(`Command 'teeny ${command}' does not exist.\n`)
+            console.log(helpText)
+            process.exit(1)
+    }
 }
 
 async function build() {
@@ -217,3 +222,5 @@ async function safeExecute(func) {
         await func()
     } catch {}
 }
+
+main()
