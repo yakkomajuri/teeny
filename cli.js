@@ -58,7 +58,6 @@ const helpArgs = ['-h', '--help']
 
 const DEFAULT_PORT = 8000
 
-
 async function build() {
     await fs.emptyDir('public/')
 
@@ -86,6 +85,53 @@ async function processDirectory(directoryPath) {
         processPagePromises.push(processPage(`${directoryPath}/${element}`))
     }
     await Promise.all(processPagePromises)
+}
+
+async function processPage(pagePath) {
+    let templatePath = 'templates/default.html'
+    const fileData = await fs.readFile(pagePath, 'utf-8')
+    const { attributes: frontmatter, body: markdown } = await fm(fileData)
+    if (frontmatter.template) {
+        templatePath = `templates/${frontmatter.template}.html`
+    }
+    const dom = await JSDOM.fromFile(templatePath)
+    const parsedHtml = marked(markdown)
+    const document = dom.window.document
+
+    const pageContentElement = document.getElementById('page-content')
+
+    if (pageContentElement) {
+        pageContentElement.innerHTML = parsedHtml
+    } else {
+        console.log(
+            `Could not find element with id 'page-content' in template ${templatePath}. Generating page without markdown content.`
+        )
+    }
+
+    const wrapperHtmlElement = document.getElementsByTagName('html')
+    if (!wrapperHtmlElement.length) {
+        console.log(`Templates should contain the 'html' tag.`)
+        process.exit(1)
+    }
+
+    let title = frontmatter.title
+    if (!title) {
+        const h1s = document.getElementsByTagName('h1')
+        if (h1s.length) {
+            title = h1s[0].innerHTML
+        }
+    }
+
+    if (title) {
+        document.title = title
+    }
+
+    const finalHtml = document.getElementsByTagName('html')[0].outerHTML
+
+    const pagePathParts = pagePath.replace('pages/', '').split('/')
+    const pageName = pagePathParts.pop().split('.md')[0]
+    const targetPath = pagePathParts.join('/')
+    await fs.writeFile(`public/${targetPath}/${pageName}.html`, finalHtml)
 }
 
 async function develop(commandArgs) {
@@ -146,52 +192,6 @@ async function init() {
     await fs.writeFile('static/main.js', exampleStaticAssetJs)
 }
 
-async function processPage(pagePath) {
-    let templatePath = 'templates/default.html'
-    const fileData = await fs.readFile(pagePath, 'utf-8')
-    const { attributes: frontmatter, body: markdown } = await fm(fileData)
-    if (frontmatter.template) {
-        templatePath = `templates/${frontmatter.template}.html`
-    }
-    const dom = await JSDOM.fromFile(templatePath)
-    const parsedHtml = marked(markdown)
-    const document = dom.window.document
-
-    const pageContentElement = document.getElementById('page-content')
-
-    if (pageContentElement) {
-        pageContentElement.innerHTML = parsedHtml
-    } else {
-        console.log(
-            `Could not find element with id 'page-content' in template ${templatePath}. Generating page without markdown content.`
-        )
-    }
-
-    const wrapperHtmlElement = document.getElementsByTagName('html')
-    if (!wrapperHtmlElement.length) {
-        console.log(`Templates should contain the 'html' tag.`)
-        process.exit(1)
-    }
-
-    let title = frontmatter.title
-    if (!title) {
-        const h1s = document.getElementsByTagName('h1')
-        if (h1s.length) {
-            title = h1s[0].innerHTML
-        }
-    }
-
-    if (title) {
-        document.title = title
-    }
-
-    const finalHtml = document.getElementsByTagName('html')[0].outerHTML
-
-    const pagePathParts = pagePath.replace('pages/', '').split('/')
-    const pageName = pagePathParts.pop().split('.md')[0]
-    const targetPath = pagePathParts.join('/')
-    await fs.writeFile(`public/${targetPath}/${pageName}.html`, finalHtml)
-}
 
 function startServer(port, hotReload) {
     console.log(`Development server starting on http://localhost:${port}`)
@@ -266,6 +266,13 @@ function main() {
     }
 
     switch (command) {
+        case 'init':
+            if (commandArgs.length > 0) {
+                console.error(`Invalid command: teeny ${scriptArgs.join(' ')}\n${commandToHelpString['init']}`)
+                process.exit(1)
+            }
+            init()
+            break
         case 'build':
             if (commandArgs.length > 0) {
                 console.error(`Invalid command: teeny ${scriptArgs.join(' ')}\n${commandToHelpString['build']}`)
@@ -276,12 +283,8 @@ function main() {
         case 'develop':
             develop(commandArgs)
             break
-        case 'init':
-            if (commandArgs.length > 0) {
-                console.error(`Invalid command: teeny ${scriptArgs.join(' ')}\n${commandToHelpString['init']}`)
-                process.exit(1)
-            }
-            init()
+        case 'plugins':
+            plugins()
             break
         case 'version':
         case '--version':
