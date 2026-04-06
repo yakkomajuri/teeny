@@ -1,5 +1,6 @@
 module.exports = {
     verboseBuild: true,
+    skipPluginsOnDevelop: true,
     plugins: [
         require('./plugins/test-plugin')({
             siteUrl: 'https://example.com',

@@ -96,7 +96,7 @@ async function build({ isDevelop } = { isDevelop: false }) {
         throw e
     }
 
-    const plugins = config.plugins || []
+    const plugins = config.skipPluginsOnDevelop && isDevelop ? [] : config.plugins || []
 
     // we don't want verbose output on isDevelop as it could be too much noise
     // can reconsider this and make it a config option in the future
