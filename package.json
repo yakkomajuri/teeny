@@ -1,6 +1,6 @@
 {
     "name": "teeny-cli",
-    "version": "1.0.0-beta",
+    "version": "1.0.1-beta",
     "description": "A very simple static site generator",
     "author": "Yakko Majuri",
     "main": "cli.js",
