@@ -55,8 +55,7 @@ const commandToHelpString = {
     version: versionHelpString,
 }
 
-const defaultTeenyConfig = `
-module.exports = {
+const defaultTeenyConfig = `module.exports = {
     plugins: []
 }`
 
