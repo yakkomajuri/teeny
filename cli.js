@@ -134,7 +134,7 @@ async function processDirectory(directoryPath, plugins, verboseMode) {
         const fullPath = `${directoryPath}/${fileOrDirPath}`
         const isDirectory = (await fs.lstat(fullPath)).isDirectory()
         if (isDirectory) {
-            await processDirectory(fullPath)
+            await processDirectory(fullPath, plugins, verboseMode)
             continue
         }
         processPagePromises.push(processPage(fullPath, plugins, verboseMode))
