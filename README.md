@@ -4,7 +4,7 @@ Teeny is a static site generator written in 350 lines of plain JavaScript. You c
 
 If you need more, you can use plugins to extend functionality.
 
-Teeny was originally built over a couple of hours (pre-AI) because I wanted something simple. You can [read that story on my blog](https://blog.yakkomajuri.com/blog/teeny).
+Teeny was originally built over a couple of hours (pre-AI) because I wanted something simple for my own personal website. You can [read that story on my blog](https://blog.yakkomajuri.com/blog/teeny).
 
 ## 🏃 Quick start
 
@@ -37,11 +37,11 @@ teeny develop
 
 ## 📄 How it works
 
-Teeny is a super simple static site generator built to suit my needs and my needs only.
+Teeny is a super simple static site generator originally built to suit my needs and my needs only, but it's very powerful in its simplicity, and may be of use to others.
 
 All it does is generate pages based on HTML templates and Markdown content.
 
-It does very little and is strongly opinionated (*read: I was too lazy to build customization/conditional handlers*), but has allowed me to build a blog I'm happy with extremely quickly.
+It does very little and is strongly opinionated, but has allowed me to build a blog I'm happy with extremely quickly.
 
 Essentially, there are really only 2 concepts you need to think about: templates and pages.
 
@@ -79,9 +79,10 @@ To start a Teeny project, run `teeny init`. This will create the following in yo
 │   └── index.md
 ├── static
 │   └── main.js
-└── templates
-    ├── default.html
-    └── homepage.html
+├── templates
+│   ├── default.html
+│   └── homepage.html
+└── teeny.config.js
 ```
 
 If you then run `teeny build`, you'll end up with this:
@@ -95,9 +96,10 @@ If you then run `teeny build`, you'll end up with this:
 │   └── main.js
 ├── static
 │   └── main.js
-└── templates
-    ├── default.html
-    └── homepage.html
+├── templates
+│   ├── default.html
+│   └── homepage.html
+└── teeny.config.js
 ```
 
 `index.md` uses the `homepage` template, and together they generate `index.html`. As is standard with other SSGs, static files are served from `public/`.
@@ -143,3 +145,36 @@ module.exports = function rssPlugin(config = {}) {
     }
 }
 ```
+
+Plugins can have two functions:
+
+* `onPage` receives the path, the parsed frontmatter, the raw markdown content, and the generated DOM object from built pages, allowing you to inject content and make changes to the pages.
+* `onBuildComplete` receives `fs` from the Node stdlib and the output directory to write files to, letting you add new files like an RSS feed to the final output.
+
+Plugins should be defined in `teeny.config.js` as follows:
+
+```javascript
+module.exports = {
+    plugins: [
+        require('./plugins/example-plugin')({
+            siteUrl: 'https://example.com',
+            title: 'My example plugin',
+            description: 'An example plugin',
+        })
+    ],
+}
+```
+
+> Note that the order plugins are defined in determines the execution order.
+
+## Contributing
+
+Teeny has been completely hand-written, with the exception of [one commit](https://github.com/yakkomajuri/teeny/commit/33dca7c79c33f06cd13797752603e132fe452c9a) that made me realize I wanted to keep LLMs away from this project.
+
+Note that I'm not against LLMs and use them extensively, including in all my other projects, but I decided that this one would remain "artisinal".
+
+What that means is that while I will accept contributions here, I'd like for you to attest that it was written by hand so we can keep the spirit alive.
+
+Bug fixes are the most welcome contributions, and features will be considered as well, as long as we're keeping the source code tiny, understandable, and in one file.
+
+Now that plugins exist, the best way to extend Teeny's functionality is by writing your own plugins. You're also more than encouraged to fork Teeny and build on top of it.
