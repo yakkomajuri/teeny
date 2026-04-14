@@ -8,7 +8,7 @@ Teeny was originally built over a couple of hours (pre-AI) because I wanted some
 
 ## 🏃 Quick start
 
-```shell
+```bash
 npm i -g teeny-cli # yarn global add teeny-cli
 teeny init && teeny develop
 ```
@@ -19,19 +19,19 @@ For an example of a project using Teeny, check out my [personal blog's repo](htt
 
 **Initialize a Teeny project in the current directory**
 
-```shell
+```bash
 teeny init
 ```
 
-**Build the static HTML files and add them to `public/`**
+**Build the static HTML files and add them to&#x20;**`public/`
 
-```shell
+```bash
 teeny build
 ```
 
 **Start a local Teeny server that listens for file changes**
 
-```shell
+```bash
 teeny develop
 ```
 
@@ -41,7 +41,7 @@ Teeny is a super simple static site generator built to suit my needs and my need
 
 All it does is generate pages based on HTML templates and Markdown content.
 
-It does very little and is strongly opinionated (_read: I was too lazy to build customization/conditional handlers_), but has allowed me to build a blog I'm happy with extremely quickly.
+It does very little and is strongly opinionated (*read: I was too lazy to build customization/conditional handlers*), but has allowed me to build a blog I'm happy with extremely quickly.
 
 Essentially, there are really only 2 concepts you need to think about: templates and pages.
 
@@ -59,7 +59,7 @@ The file need not have any actual content though, so if you want a page to be de
 
 To specify what template a page should use, you can specify it in the frontmatter of the page, like so:
 
-```
+```markdown
 ---
 template: blog
 ---
@@ -73,7 +73,7 @@ Here's an example of Teeny at work.
 
 To start a Teeny project, run `teeny init`. This will create the following in your current directory:
 
-```
+```bash
 .
 ├── pages
 │   └── index.md
@@ -86,7 +86,7 @@ To start a Teeny project, run `teeny init`. This will create the following in yo
 
 If you then run `teeny build`, you'll end up with this:
 
-```
+```bash
 .
 ├── pages
 │   └── index.md
