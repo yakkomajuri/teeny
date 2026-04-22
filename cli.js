@@ -10,7 +10,14 @@ const path = require('path')
 
 let sseClients = []
 
-const reloadScript = `<script>new EventSource('/__reload').onmessage=()=>location.reload()</script>`
+const reloadScript = `<script>
+const hotReloadEventSource = new EventSource('/__reload')
+hotReloadEventSource.addEventListener("onmessage", () => location.reload())
+window.addEventListener("beforeunload", () => {
+    console.log('closing')
+    hotReloadEventSource.close()
+});
+</script>`
 
 const mainHelpString = `teeny - a very simple static site generator
 
